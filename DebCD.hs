@@ -142,10 +142,12 @@ getSender conf =
                    , sesSecretKey = S8.pack $ secret
                    }
   in case mses of
-       Nothing -> return $ const $ return () 
+       Nothing -> return $ putStrLn . unlines 
        Just ses -> do man <- newManager conduitManagerSettings
-                      return $  runResourceT . sendMailSES man ses . fromString . unlines
-
+                      return $  \ss -> do
+                          runResourceT . sendMailSES man ses . fromString . unlines $ ss
+                          putStrLn $ unlines ss
+                          putStrLn "(sent email)             
 
 psh :: String -> IO (Either String String)
 psh cmd =

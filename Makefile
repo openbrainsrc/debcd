@@ -18,7 +18,7 @@ deb:
 
 	cp .cabal-sandbox/bin/debcd install_root/usr/sbin/
 	cp pass install_root/etc/debcd/tests.d/
-	cp debconf.yml.example install_root/etc/debcd/
+	cp debcd.yml.example install_root/etc/debcd/
 
 	cp debcd.nightly install_root/etc/cron.daily/
 	cp debcd.hourly install_root/etc/cron.hourly/
