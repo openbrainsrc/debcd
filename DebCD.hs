@@ -30,10 +30,9 @@ main = do
 
  -- update 
  case upRepos of
-{-   "all" -> void $ system "apt-get update"
-   "none" -> return ()   
-   _ -> void $ system "apt-get update" -}
-   _ -> return ()
+   "all" -> void $ system "apt-get update"
+   "none" -> return ()
+   repo -> void $ system "sudo apt-get update -o Dir::Etc::sourcelist=\"sources.list.d/"++repo++".list\"-o Dir::Etc::sourceparts=\"-\" -o APT::Get::List-Cleanup=\"0\""
 
  upgradesAvailable <- do ex <- system "apt-get -u upgrade --assume-no"
                          return $ ex /= ExitSuccess 
@@ -42,7 +41,6 @@ main = do
 
  -- upgrade 
  when upgradesAvailable $ upgrade sender
- upgrade sender
 
 upgrade sender = do
 
