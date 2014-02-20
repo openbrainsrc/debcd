@@ -4,6 +4,8 @@ module Main where
 
 import qualified Data.Yaml.Config as YConf
 import System.Environment
+import System.Exit
+
 import qualified Data.Text as T
 import Network.Mail.Mime.SES
 import qualified Data.Text.Encoding as DTE
@@ -12,6 +14,10 @@ import qualified Data.ByteString.Lazy as LBS
 import Network.HTTP.Conduit
 import Control.Monad
 import Data.Conduit
+import System.Cmd
+import Data.Time
+import System.Locale (defaultTimeLocale)
+import qualified Data.Time.Format as DTF
 
 confPath = "/etc/debcd/debcd.yml"
 
@@ -21,17 +27,42 @@ main = do
 
  let upRepos = YConf.lookupDefault "update-repos" ("all"::String) conf
 
- -- create dpkg freeze file
+ -- update 
+ case upRepos of
+   "all" -> void $ system "apt-get update"
+   "none" -> return ()   
+   _ -> void $ system "apt-get update"
 
- -- update
- 
+ upgradesAvailable <- do ex <- system "apt-get -u upgrade --assume-no"
+                         return $ ex /= ExitSuccess 
+
+ putStrLn $ "Upgrades available: "++ show upgradesAvailable
+
  -- upgrade 
+ when upgradesAvailable $ upgrade sender
+
+
+upgrade sender = do
+
+ selections <- createFreezeList
+ void $ system "apt-get upgrade"
 
  -- run tests
 
  -- roll back on failure
 
  return ()
+
+createFreezeList :: IO String
+createFreezeList = do
+ now <- getCurrentTime
+ let nowS =  DTF.formatTime defaultTimeLocale "%Y%m%d%H%M" now
+ -- create dpkg freeze file. http://www.debian-administration.org/article/669/
+ system "mkdir -p /var/debcd"
+ system $ "aptitude -q -F \"%?p=%?V %M\" --disable-columns search \\~i > /var/debcd/"
+          ++nowS
+ return nowS
+
 
 getConfig :: IO YConf.Config
 getConfig = do
