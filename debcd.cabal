@@ -1,0 +1,25 @@
+Name:                debcd
+Version:             0.1
+Description:         Continuous deployment for debian-based systems
+License:             BSD3
+License-file:        LICENSE
+Author:              Tom Nielsen
+Maintainer:          tomn@openbrain.org
+build-type:          Simple
+Cabal-Version:       >= 1.8
+
+Executable debcd
+   Main-Is:        DebCD.hs
+   ghc-options:    -threaded
+   Build-depends:   base                     >= 4.6        && < 5
+                  , text
+                  , directory
+                  , process
+                  , mtl
+                  , time
+                  , old-locale
+                  , yaml-config
+                  , mime-mail-ses        
+                  , bytestring  
+                  , http-conduit
+                  , conduit
