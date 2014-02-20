@@ -66,6 +66,7 @@ update conf sender = do
 upgrade sender = do
 
  selections <- createFreezeList
+ putStrLn "upgrading.."
  upgRes <- psh "apt-get upgrade"
  case upgRes of
    Left err -> sender $ ["debcd: error upgrading packages", 
@@ -85,6 +86,7 @@ upgrade sender = do
 runTests sender = do
   files <- getDirectoryContents "/etc/debcd/tests.d/"
   testRess <-  forM files $ \file -> do
+    debug $ "running test "++ file
     p <- getPermissions $ "/etc/debcd/tests.d/"++file
     if not $ executable p
        then return Nothing
