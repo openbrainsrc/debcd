@@ -147,7 +147,7 @@ getSender conf =
                       return $  \ss -> do
                           runResourceT . sendMailSES man ses . fromString . unlines $ ss
                           putStrLn $ unlines ss
-                          putStrLn "(sent email)             
+                          putStrLn "(sent email)"             
 
 psh :: String -> IO (Either String String)
 psh cmd =
