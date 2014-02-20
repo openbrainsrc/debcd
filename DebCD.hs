@@ -154,9 +154,9 @@ getSender conf =
 psh :: String -> IO (Either String String)
 psh cmd =
   bracketOnError
-  (createProcess $ (shell cmd) { std_out = CreatePipe
+  (debug cmd >> (createProcess $ (shell cmd) { std_out = CreatePipe
                                , std_err = CreatePipe
-                               , create_group = True })
+                               , create_group = True }))
   (\(_, Just hout, Just herr, ph) -> do
       interruptProcessGroupOf ph
       terminateProcess ph
