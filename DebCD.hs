@@ -51,7 +51,7 @@ update conf sender = do
              "all"  -> "apt-get update"
              "none" -> "echo Nothing to do"
              repo   -> "apt-get update -o Dir::Etc::sourcelist=\"sources.list.d/"++
-                               repo++".list\"-o Dir::Etc::sourceparts=\"-\" "++
+                               repo++".list\" -o Dir::Etc::sourceparts=\"-\" "++
                                "-o APT::Get::List-Cleanup=\"0\""
 
   updateRes <- psh updateCmd
@@ -135,7 +135,7 @@ getConfig = do
 getSender :: YConf.Config -> IO ([String] -> IO ())
 getSender conf = 
   let mses = do emailTo <- YConf.lookup "emailTo" conf
-                emailFrom <- YConf.lookup "emailTo" conf
+                emailFrom <- YConf.lookup "emailFrom" conf
                 access <-  YConf.lookup "aws_access" conf
                 secret <-  YConf.lookup "aws_secret" conf
                 return $ SES
