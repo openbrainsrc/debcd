@@ -87,11 +87,11 @@ upgrade sender = do
 runTests sender = do
   files <- getDirectoryContents "/etc/debcd/tests.d/"
   testRess <-  forM files $ \file -> do
-    debug $ "running test "++ file
     p <- getPermissions $ "/etc/debcd/tests.d/"++file
     if not $ executable p
        then return Nothing
-       else do res <- psh $ "/etc/debcd/tests.d/"++file
+       else do debug $ "running test "++ file
+               res <- psh $ "/etc/debcd/tests.d/"++file
                case res of 
                  Right _ -> return Nothing
                  Left err -> return $ Just $ "Test: "++file++"\nOutput:\n"++ 
