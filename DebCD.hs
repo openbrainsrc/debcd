@@ -14,59 +14,89 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import Network.HTTP.Conduit
 import Control.Monad
+import Data.Monoid
+import Data.Maybe
+import Data.String
+
 import Data.Conduit
 import System.Cmd
 import Data.Time
 import System.Locale (defaultTimeLocale)
 import qualified Data.Time.Format as DTF
 
+import System.Process
+import System.Cmd
+import System.IO
+import System.Exit
+import qualified Control.Exception as C
+import Control.Exception
+import Control.DeepSeq (rnf)
+import Control.Concurrent
+
+
 confPath = "/etc/debcd/debcd.yml"
 
 main = do
- conf <- getConfig
- sender <- getSender conf
+  conf <- getConfig
+  sender <- getSender conf
 
- let upRepos = YConf.lookupDefault "update-repos" ("all"::String) conf
+  update conf sender
 
- -- update 
- case upRepos of
-   "all" -> void $ system "apt-get update"
-   "none" -> return ()
-   repo -> void $ system $ "sudo apt-get update -o Dir::Etc::sourcelist=\"sources.list.d/"++repo++".list\"-o Dir::Etc::sourceparts=\"-\" -o APT::Get::List-Cleanup=\"0\""
+update conf sender = do
 
- upgradesAvailable <- do ex <- system "apt-get -u upgrade --assume-no"
-                         return $ ex /= ExitSuccess 
+  let upRepos = YConf.lookupDefault "update-repos" ("all"::String) conf
 
- putStrLn $ "Upgrades available: "++ show upgradesAvailable
+      updateCmd 
+         = case upRepos of
+             "all"  -> "apt-get update"
+             "none" -> "echo Nothing to do"
+             repo   -> "apt-get update -o Dir::Etc::sourcelist=\"sources.list.d/"++
+                               repo++".list\"-o Dir::Etc::sourceparts=\"-\" "++
+                               "-o APT::Get::List-Cleanup=\"0\""
 
- -- upgrade 
- when upgradesAvailable $ upgrade sender
+  updateRes <- psh updateCmd
+  case updateRes of
+    Left err -> sender $ ["debcd: error updating APT", 
+                          "\nError:\n ", err]
+    Right _ -> do
+        upgradesAvailable <- fmap ((/=) ExitSuccess) 
+                                  $ system "apt-get -u upgrade --assume-no"                               
+        when upgradesAvailable $ upgrade sender
 
 upgrade sender = do
 
  selections <- createFreezeList
- void $ system "apt-get upgrade"
+ upgRes <- psh "apt-get upgrade"
+ case upgRes of
+   Left err -> sender $ ["debcd: error upgrading packages", 
+                          "\nError:\n ", err]
+   Right _ -> do
 
- -- run tests
- testsOK <- runTests 
+       -- run tests
+       testsOK <- runTests sender
 
- -- roll back on failure
- when (not testsOK) $ rollback selections
+       -- roll back on failure
+       when (not testsOK) $ rollback selections
 
- return ()
+       return ()
 
 -- these two based on http://www.debian-administration.org/article/669/
 
-runTests = do
+runTests sender = do
   files <- getDirectoryContents "/etc/debcd/tests.d/"
-  fmap and $ forM files $ \file -> do
+  testRess <-  forM files $ \file -> do
     p <- getPermissions $ "/etc/debcd/tests.d/"++file
     if not $ executable p
-       then return True
-       else do res <- system $ "/etc/debcd/tests.d/"++file
+       then return Nothing
+       else do res <- psh $ "/etc/debcd/tests.d/"++file
                case res of 
-                 ExitSuccess -> return True
-                 ExitFailure _ -> return False
+                 Right _ -> return Nothing
+                 Left err -> return $ Just $ "Test: "++file++"\nOutput:\n"++ 
+                                               (unlines $ map ("  "++) $ lines err)
+  if all isNothing testRess
+     then return True
+     else do sender ("debcd: Test failure":catMaybes testRess)
+             return False
 
 createFreezeList :: IO String
 createFreezeList = do
@@ -99,7 +129,7 @@ getConfig = do
                              T.unpack envNm++" in "++confPath
            Just c -> return c
 
-getSender :: YConf.Config -> IO (LBS.ByteString -> IO ())
+getSender :: YConf.Config -> IO ([String] -> IO ())
 getSender conf = 
   let mses = do emailTo <- YConf.lookup "emailTo" conf
                 emailFrom <- YConf.lookup "emailTo" conf
@@ -114,5 +144,36 @@ getSender conf =
   in case mses of
        Nothing -> return $ const $ return () 
        Just ses -> do man <- newManager conduitManagerSettings
-                      return $  runResourceT . sendMailSES man ses 
+                      return $  runResourceT . sendMailSES man ses . fromString . unlines
 
+
+psh :: String -> IO (Either String String)
+psh cmd =
+  bracketOnError
+  (createProcess $ (shell cmd) { std_out = CreatePipe
+                               , std_err = CreatePipe
+                               , create_group = True })
+  (\(_, Just hout, Just herr, ph) -> do
+      interruptProcessGroupOf ph
+      terminateProcess ph
+      _ <- slurp hout herr
+      _ <- waitForProcess ph
+      return $ Left "Terminated")
+  (\(_, Just hout, Just herr, ph) -> do
+      (sout, serr) <- slurp hout herr
+      excode <- waitForProcess ph
+      case excode of
+        ExitSuccess -> return $ Right sout
+        ExitFailure _ -> return $ Left (sout++serr))
+  where slurp hout herr = do
+          sout <- hGetContents hout ; serr <- hGetContents herr
+          waitOut <- forkWait sout  ; waitErr <- forkWait serr
+          waitOut                   ; waitErr
+          hClose hout               ; hClose herr
+          return (sout, serr)
+        forkWait a = do
+          res <- newEmptyMVar
+          _ <- mask $ \restore ->
+            forkIO $ try (restore $ C.evaluate $ rnf a) >>= putMVar res
+          return (takeMVar res >>=
+                  either (\ex -> throwIO (ex :: SomeException)) return)
