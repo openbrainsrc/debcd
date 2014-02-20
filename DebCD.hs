@@ -67,7 +67,7 @@ upgrade sender = do
 
  selections <- createFreezeList
  putStrLn "upgrading.."
- upgRes <- psh "apt-get upgrade -y"
+ upgRes <- psh "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y"
  case upgRes of
    Left err -> sender $ ["debcd: error upgrading packages", 
                           "\nError:\n ", err]
