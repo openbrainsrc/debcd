@@ -165,8 +165,10 @@ psh cmd =
       (sout, serr) <- slurp hout herr
       excode <- waitForProcess ph
       case excode of
-        ExitSuccess -> return $ Right sout
-        ExitFailure _ -> return $ Left (sout++serr))
+        ExitSuccess ->   do debug sout
+                            return $ Right sout
+        ExitFailure _ -> do debug $ sout++serr
+                            return $ Left (sout++serr))
   where slurp hout herr = do
           sout <- hGetContents hout ; serr <- hGetContents herr
           waitOut <- forkWait sout  ; waitErr <- forkWait serr
@@ -179,3 +181,7 @@ psh cmd =
             forkIO $ try (restore $ C.evaluate $ rnf a) >>= putMVar res
           return (takeMVar res >>=
                   either (\ex -> throwIO (ex :: SomeException)) return)
+
+debug s = do 
+  args <- getArgs 
+  when ("--verbose" `elem` args) $ putStrLn s
