@@ -1,0 +1,10 @@
+hourly:  &defaults
+  update-repos: openbrain
+  emailTo: tomn@openbrain.org
+  emailFrom: admin@bayeshive.com
+  aws_access: YOUR-ACCESS-HERE
+  aws_secret: YOUR-SECRET-HERE
+
+nightly:
+  update-repos: all
+  <<: *defaults
