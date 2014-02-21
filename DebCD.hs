@@ -104,17 +104,26 @@ runTests sender = do
      else do sender ("debcd: Test failure":catMaybes testRess)
              return False
 
-createFreezeList :: IO String
+createFreezeList :: IO [(String, String)]
 createFreezeList = do
  now <- getCurrentTime
  let nowS =  DTF.formatTime defaultTimeLocale "%Y%m%d%H%M" now
- system "mkdir -p /var/debcd"
- system $ "apt-clone clone /var/debcd/"++nowS
- return nowS
+ res <- psh $ "aptitude -F%p --disable-columns search ~U"
+ case res of 
+   Right s -> forM (lines s) $ \pkgNm -> do
+                Right version <- psh $ "dpkg-query -W -f='${Version}' "++pkgNm
+                return (pkgNm,version)
 
-rollback :: String -> IO ()
-rollback list = void $ do
- system $ "apt-clone restore /var/debcd/"++list++".apt-clone.tar.gz"
+rollback :: [(String, String)] -> IO ()
+rollback list = forM_ list $ \(pkgNm, ver) -> do
+  putStrLn $ "rolling back "++pkgNm++" "++ver++".."
+
+  -- this would be the right thing to do if reprepro stored old versions
+  -- system $ "apt-get install "++pkgNm++"="++ver 
+
+  -- cheap, fragile hack
+  system $ "dpkg -i /var/cache/apt/archives/"++pkgNm++"_"++ver++"_*.deb"
+  return ()
 
 getConfig :: IO YConf.Config
 getConfig = do
