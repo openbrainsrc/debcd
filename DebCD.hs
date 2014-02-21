@@ -17,6 +17,7 @@ import Control.Monad
 import Data.Monoid
 import Data.Maybe
 import Data.String
+import Data.List (sort)
 
 import Data.Conduit
 import System.Cmd
@@ -126,7 +127,7 @@ getConfig = do
             (env:_, _) -> T.pack env
             ([], []) -> error $ "debcd: unable to determine a configuration "++
                                 "environment from "++confPath
-            ([] , env:_) -> env
+            ([] , envs) -> head $ sort envs
  case YConf.subconfig envNm allConfig of
            Nothing -> fail $ "Cannot find configuration environment "++
                              T.unpack envNm++" in "++confPath
