@@ -20,8 +20,8 @@ deb:
 	cp pass install_root/etc/debcd/tests.d/
 	cp debcd.yml.example install_root/etc/debcd/
 
-	cp debcd.nightly install_root/etc/cron.daily/
-	cp debcd.hourly install_root/etc/cron.hourly/
+	cp debcd_nightly install_root/etc/cron.daily/
+	cp debcd_hourly install_root/etc/cron.hourly/
 	cd install_root && fpm -s dir -t deb -n debcd -v 0.1.$(now) -d aptitude --prefix / .
 	cd /srv/reprepro/ubuntu && reprepro includedeb openbrain /tmp/debcd/install_root/debcd_0.1.$(now)_amd64.deb
 
