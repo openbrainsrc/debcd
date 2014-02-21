@@ -122,7 +122,7 @@ getConfig :: IO YConf.Config
 getConfig = do
  allConfig <- YConf.load confPath
  args <- getArgs
- let envNm = case (args, YConf.keys allConfig) of
+ let envNm = case (filter notOption args, YConf.keys allConfig) of
             (env:_, _) -> T.pack env
             ([], []) -> error $ "debcd: unable to determine a configuration "++
                                 "environment from "++confPath
@@ -131,6 +131,9 @@ getConfig = do
            Nothing -> fail $ "Cannot find configuration environment "++
                              T.unpack envNm++" in "++confPath
            Just c -> return c
+
+notOption ('-':_) = False
+notOption _ = True
 
 getSender :: YConf.Config -> IO ([String] -> IO ())
 getSender conf = 
