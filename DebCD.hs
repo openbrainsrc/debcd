@@ -109,17 +109,12 @@ createFreezeList = do
  now <- getCurrentTime
  let nowS =  DTF.formatTime defaultTimeLocale "%Y%m%d%H%M" now
  system "mkdir -p /var/debcd"
- system $ "aptitude -q -F \"%?p=%?V %M\" --disable-columns search \\~i > /var/debcd/"
-          ++nowS
+ system $ "apt-clone clone /var/debcd/"++nowS
  return nowS
 
 rollback :: String -> IO ()
 rollback list = void $ do
-  system $ "aptitude -q -R --schedule-only install $(awk < /var/debcd/"++
-           list++" '{print $1}')"
-  system $ "aptitude -q -R --schedule-only markauto $(awk < /var/debcd/"++
-           list++" '$2==\"A\" {split($1,A,\"=\");print A[1]}')"
-  system $ "aptitude -y -o Dpkg::Options::=\"--force-confdef\" install"
+ system $ "apt-clone restore /var/debcd/"++list++".apt-clone.tar.gz"
 
 getConfig :: IO YConf.Config
 getConfig = do
