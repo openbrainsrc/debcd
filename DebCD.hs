@@ -71,8 +71,10 @@ upgrade sender = do
  upgRes <- system "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y"
  putStrLn "..done upgrading"
  case upgRes of
-   ExitFailure err -> sender $ ["debcd: error upgrading packages", 
-                          "\nError:\n ", show err]
+   ExitFailure err -> do rollback selections
+                         sender $ ["debcd: error upgrading packages", 
+                            "\nError:\n ", show err]
+                          
    ExitSuccess -> do
 
        -- run tests
