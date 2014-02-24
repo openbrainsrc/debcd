@@ -116,7 +116,7 @@ createFreezeList = do
 
 rollback :: [(String, String)] -> IO ()
 rollback list = forM_ list $ \(pkgNm, ver) -> do
-  putStrLn $ "rolling back "++pkgNm++" "++ver++".."
+  putStrLn $ "rolling back "++pkgNm++" to version "++ver++".."
 
   -- this would be the right thing to do if reprepro stored old versions
   -- system $ "apt-get install "++pkgNm++"="++ver 
