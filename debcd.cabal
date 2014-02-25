@@ -19,8 +19,8 @@ Executable debcd
                   , time
                   , old-locale
                   , yaml-config
-                  , mime-mail-ses        
+                  , mime-mail-ses            >= 0.2.2
+                  , mime-mail
                   , bytestring  
                   , http-conduit
-                  , conduit
                   , deepseq

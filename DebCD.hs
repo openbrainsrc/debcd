@@ -9,6 +9,7 @@ import System.Exit
 
 import qualified Data.Text as T
 import Network.Mail.Mime.SES
+import Network.Mail.Mime
 import qualified Data.Text.Encoding as DTE
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
@@ -19,7 +20,6 @@ import Data.Maybe
 import Data.String
 import Data.List (sort)
 
-import Data.Conduit
 import System.Cmd
 import Data.Time
 import System.Locale (defaultTimeLocale)
@@ -156,9 +156,20 @@ getSender conf =
                    }
   in case mses of
        Nothing -> return $ putStrLn . unlines 
-       Just ses -> do man <- newManager conduitManagerSettings
+       Just ses -> do manager <- newManager conduitManagerSettings
                       return $  \ss -> do
-                          runResourceT . sendMailSES man ses . fromString . unlines $ ss
+                          let mailPart 
+                               = Part { partType = "text/plain; charset=utf-8"
+                                      , partEncoding = None, partFilename = Nothing
+                                      , partHeaders = []
+                                      , partContent = LBS.fromStrict $ DTE.encodeUtf8 $ T.pack $ unlines ss }
+
+                          renderSendMailSES manager ses
+                              (emptyMail $ Address (Just "DebCD instance") (DTE.decodeUtf8 $ sesFrom ses))
+                                  { mailTo = map (Address Nothing . DTE.decodeUtf8) (sesTo ses)
+                                  , mailHeaders = [ ("Subject", "DebCD report") ]
+                                  , mailParts = [[mailPart]] }
+
                           putStrLn $ unlines ss
                           putStrLn "(sent email)"             
 
