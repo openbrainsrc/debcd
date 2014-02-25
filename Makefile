@@ -7,7 +7,7 @@ citest:
 
 cabalinstall:
 	cabal sandbox init
-	cabal install
+	cabal install --force-resintalls
 
 deb:
 	rm -rf install_root
