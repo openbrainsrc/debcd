@@ -4,6 +4,7 @@ hourly:  &defaults
   emailFrom: admin@bayeshive.com
   aws_access: YOUR-ACCESS-HERE
   aws_secret: YOUR-SECRET-HERE
+  test-delay-secs: 5
 
 nightly:
   update-repos: all
