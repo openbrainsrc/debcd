@@ -18,7 +18,7 @@ import Control.Monad
 import Data.Monoid
 import Data.Maybe
 import Data.String
-import Data.List (sort)
+import Data.List (sort, intercalate)
 
 import System.Cmd
 import Data.Time
@@ -33,6 +33,7 @@ import qualified Control.Exception as C
 import Control.Exception
 import Control.DeepSeq (rnf)
 import Control.Concurrent
+import Prelude hiding (log)
 
 
 confPath = "/etc/debcd/debcd.yml"
@@ -57,16 +58,22 @@ update conf sender = do
 
   updateRes <- psh updateCmd
   case updateRes of
-    Left err -> sender $ ["debcd: error updating APT", 
-                          "\nError:\n ", err]
+    Left err -> do sender $ ["debcd: error updating APT", 
+                               "\nError:\n ", err]
+                   logFail $ "apt-update error: "++err 
     Right _ -> do
         upgradesAvailable <- fmap ((/=) ExitSuccess) 
                                   $ system "apt-get -u upgrade --assume-no"                               
-        when upgradesAvailable $ upgrade sender
+        when upgradesAvailable $ upgrade conf sender
 
-upgrade sender = do
+upgrade conf sender = do
+
+ let test_delay = YConf.lookupDefault "test-delay-secs" (0::Int) conf
 
  selections <- createFreezeList
+
+ log $ "upgrading from "++intercalate ", " (map (\(pkg,v)-> pkg++"-"++v) selections)
+
  putStrLn "upgrading.."
  upgRes <- system "DEBIAN_FRONTEND=noninteractive apt-get upgrade -y"
  putStrLn "..done upgrading"
@@ -74,14 +81,20 @@ upgrade sender = do
    ExitFailure err -> do rollback selections
                          sender $ ["debcd: error upgrading packages", 
                             "\nError:\n ", show err]
+                         logFail $ "apt-upgrade error: "++show err 
+                            
                           
    ExitSuccess -> do
 
        -- run tests
+       threadDelay (test_delay* 1000*1000)
+
        testsOK <- runTests sender
 
        -- roll back on failure
-       when (not testsOK) $ rollback selections
+       when (not testsOK) $ do 
+          log $ "rollback"
+          rollback selections
 
        return ()
 
@@ -101,13 +114,13 @@ runTests sender = do
                                                (unlines $ map ("  "++) $ lines err)
   if all isNothing testRess
      then return True
-     else do sender ("debcd: Test failure":catMaybes testRess)
+     else do log $ "test failures: "++ unlines (catMaybes testRess)
+             sender ("debcd: Test failure":catMaybes testRess)
              return False
 
 createFreezeList :: IO [(String, String)]
 createFreezeList = do
  now <- getCurrentTime
- let nowS =  DTF.formatTime defaultTimeLocale "%Y%m%d%H%M" now
  res <- psh $ "aptitude -F%p --disable-columns search ~U"
  case res of 
    Right s -> forM (lines s) $ \pkgNm -> do
@@ -129,15 +142,16 @@ getConfig :: IO YConf.Config
 getConfig = do
  allConfig <- YConf.load confPath
  args <- getArgs
- let envNm = case (filter notOption args, YConf.keys allConfig) of
-            (env:_, _) -> T.pack env
-            ([], []) -> error $ "debcd: unable to determine a configuration "++
-                                "environment from "++confPath
-            ([] , envs) -> head $ sort envs
+ envNm <- case (filter notOption args, YConf.keys allConfig) of
+            (env:_, _)  -> return $ T.pack env
+            ([], [])    -> logFail $ "No env args, no envs in config file "++confPath
+            ([] , envs) -> return $ head $ sort envs
+
  case YConf.subconfig envNm allConfig of
-           Nothing -> fail $ "Cannot find configuration environment "++
-                             T.unpack envNm++" in "++confPath
-           Just c -> return c
+           Nothing -> logFail $ "Cannot find configuration environment "++
+                                 T.unpack envNm++" in "++confPath
+           Just c -> do log $ "invoke with envirnoment "++T.unpack envNm
+                        return c
 
 notOption ('-':_) = False
 notOption _ = True
@@ -209,3 +223,16 @@ psh cmd =
 debug s = do 
   args <- getArgs 
   when ("--verbose" `elem` args) $ putStrLn s
+
+log :: String -> IO ()
+log s = do
+  now <- getCurrentTime
+  let ts = DTF.formatTime defaultTimeLocale "%F %T" now
+  appendFile "/var/log/debcd.log" $ ts++" "++s++"\n"
+
+logFail :: String -> IO a
+logFail s = do
+  log $ "FATAL ERROR:" ++s
+  hPutStrLn stderr s
+  exitWith $ ExitFailure 1
+  --return undefined
