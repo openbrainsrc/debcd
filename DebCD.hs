@@ -150,7 +150,7 @@ getConfig = do
  case YConf.subconfig envNm allConfig of
            Nothing -> logFail $ "Cannot find configuration environment "++
                                  T.unpack envNm++" in "++confPath
-           Just c -> do log $ "invoke with envirnoment "++T.unpack envNm
+           Just c -> do log $ "invoke with environment "++T.unpack envNm
                         return c
 
 notOption ('-':_) = False
