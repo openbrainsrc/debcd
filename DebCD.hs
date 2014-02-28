@@ -96,9 +96,12 @@ upgrade conf sender = do
           log $ "rollback"
           rollbackSuccess <- rollback selections
           when (not rollbackSuccess) $ do
-             sender ["rollback failure"]
-             logFail "Rollback failure" 
-          
+             testsOK <- runTests noSender
+             if testsOK 
+                then do sender ["Rollback failure"]
+                        logFail "Rollback failure" 
+                else do sender ["Rollback failure, tests failing"]
+                        logFail "Rollback failure, tests failing" 
 
        return ()
 
@@ -158,6 +161,9 @@ getConfig = do
 
 notOption ('-':_) = False
 notOption _ = True
+
+noSender :: [String] -> IO ()
+noSender = const $ return ()
 
 getSender :: YConf.Config -> IO ([String] -> IO ())
 getSender conf = 
