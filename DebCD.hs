@@ -94,7 +94,11 @@ upgrade conf sender = do
        -- roll back on failure
        when (not testsOK) $ do 
           log $ "rollback"
-          rollback selections
+          rollbackSuccess <- rollback selections
+          when (not rollbackSuccess) $ do
+             sender ["rollback failure"]
+             logFail "Rollback failure" 
+          
 
        return ()
 
@@ -127,16 +131,15 @@ createFreezeList = do
                 Right version <- psh $ "dpkg-query -W -f='${Version}' "++pkgNm
                 return (pkgNm,version)
 
-rollback :: [(String, String)] -> IO ()
-rollback list = forM_ list $ \(pkgNm, ver) -> do
+rollback :: [(String, String)] -> IO Bool -- all pass
+rollback list = fmap and $ forM list $ \(pkgNm, ver) -> do
   putStrLn $ "rolling back "++pkgNm++" to version "++ver++".."
 
   -- this would be the right thing to do if reprepro stored old versions
   -- system $ "apt-get install "++pkgNm++"="++ver 
 
   -- cheap, fragile hack
-  system $ "dpkg -i /var/cache/apt/archives/"++pkgNm++"_"++ver++"_*.deb"
-  return ()
+  fmap (==ExitSuccess) $ system $ "dpkg -i /var/cache/apt/archives/"++pkgNm++"_"++ver++"_*.deb"
 
 getConfig :: IO YConf.Config
 getConfig = do
